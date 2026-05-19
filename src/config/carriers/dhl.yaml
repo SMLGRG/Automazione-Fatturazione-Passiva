@@ -1,0 +1,32 @@
+# src/config/carriers/dhl.yaml
+carrier_name: "DHL"
+
+# Parole chiave cercate nel testo (Markdown) per l'identificazione automatica
+keywords:
+  - "DHL Express"
+  - "DHL Parcel"
+  - "Deutsche Post"
+  - "DHL Freight"
+
+# Sinonimi delle colonne per la futura normalizzazione dei dati tabellari
+column_aliases:
+  tracking_number: 
+    - "Tracking"
+    - "Sendungsnummer"
+    - "AWB"
+    - "Codice Spedizione"
+    - "Air Waybill"
+  total_amount:    
+    - "Importo"
+    - "Amount"
+    - "Betrag"
+    - "Prezzo"
+    - "Net Amount"
+  weight_kg:       
+    - "Peso"
+    - "Weight"
+    - "Gewicht"
+    - "Kg"
+
+# Path puramente documentale per tracciare lo studio del layout (fase M5)
+layout_doc: "docs/layouts/dhl_invoice_layout.md"
