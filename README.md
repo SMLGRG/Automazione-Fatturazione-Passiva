@@ -43,8 +43,17 @@ PDF Fattura Trasportatore
 
 Il progetto è distribuito come repository Git. I prerequisiti per l'utente finale sono due installazioni standard, gratuite e con installer ufficiale:
 
-1. **Python ≥ 3.11** — [python.org/downloads](https://www.python.org/downloads/)
-2. **Ollama per Windows/Mac/Linux** — [ollama.com/download](https://ollama.com/download)
+## 🛠️ Prerequisiti del Sistema
+
+Per poter eseguire o sviluppare l'applicazione, è necessario che sul computer siano installati i seguenti componenti:
+
+1. **Python (Versione consigliata: 3.11 o 3.12)** * **Nota importante sulla compatibilità:** Le versioni di Python troppo recenti (come Python 3.14 e superiori) **non sono attualmente supportate** a causa della mancanza di build pre-compilate per alcune librerie fondamentali di calcolo e intelligenza artificiale (es. PyTorch, Outlines).  
+   * **Download:** Scarica l'installer ufficiale da [python.org/downloads](https://www.python.org/downloads/).  
+   * *In fase di installazione su Windows, ricordati di spuntare la casella **"Add Python to PATH"**.*
+
+2. **Ollama (Disponibile per Windows, Mac e Linux)** * Ollama è il motore leggero che permette di eseguire l'Intelligenza Artificiale (`phi4-mini`) in locale sul tuo computer, garantendo la massima privacy dei dati delle fatture.  
+   * **Download:** Scarica l'installer ufficiale da [ollama.com/download](https://ollama.com/download).  
+   * *Dopo l'installazione, assicurati che Ollama sia avviato (dovresti vedere l'icona dell'applicazione nella barra di sistema vicino all'orologio).*
 
 Una volta installati, basta fare doppio clic su:
 - **`avvia.bat`** — su Windows
