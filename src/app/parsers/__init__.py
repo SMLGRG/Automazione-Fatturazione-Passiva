@@ -26,15 +26,15 @@ class BaseParser(ABC):
     """
 
     def __init__(self):
-        # Configurazione ottimizzata di Docling con OCR attivo per scansioni e tabelle
+        from docling.document_converter import PdfFormatOption
         pipeline_options = PdfPipelineOptions()
         pipeline_options.do_ocr = True
         pipeline_options.do_table_structure = True
-        pipeline_options.ocr_options.lang = ["it", "en"]
 
         self.converter = DocumentConverter(
-            allowed_formats=[InputFormat.PDF],
-            pipeline_options=pipeline_options,
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+            }
         )
 
     def convert_to_markdown(self, pdf_path: Path, markdown_output_path: Path) -> str:
@@ -78,5 +78,4 @@ class GenericParser(BaseParser):
     """
 
     def post_process(self, markdown: str) -> str:
-        # Nessuna pulizia specifica applicata per il parser generico
         return markdown
