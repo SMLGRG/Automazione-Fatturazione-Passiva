@@ -6,3 +6,4 @@ outputs/
 *.db
 .venv/
 tests
+config/carriers
