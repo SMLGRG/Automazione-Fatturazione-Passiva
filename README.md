@@ -1,3 +1,7 @@
+# Premessa
+
+Da notare che il progetto è ancora in fase di sviluppo, attualmente le funzionalità tecniche sono presenti e funzionanti, tuttavia l'implementazione della IA richiede ancora refinement
+
 # Fatturazione Passiva — Automazione Fatture Trasportatori
 
 Pipeline 100% locale per leggere le fatture PDF dei trasportatori, estrarne i dati con un'AI e confrontarli con il database aziendale.
@@ -36,15 +40,11 @@ PDF fattura trasportatore
   Confronta ogni spedizione con i costi attesi e segnala le discrepanze
 ```
 
-Il passaggio più interessante è lo **Smart Compressor**: analizza quante volte ogni riga di testo si ripete tra le pagine del documento e rimuove automaticamente tutto il boilerplate (intestazioni aziendali, piè di pagina, note legali ripetute) prima di mandare il testo all'AI. Risultato: meno token, elaborazione più veloce e risultati migliori.
-
-Il sistema riconosce automaticamente il trasportatore mittente leggendo il testo della fattura e applica il parser più adatto. Ogni trasportatore è configurabile con un file YAML, senza toccare il codice.
-
 ---
 
 ## Avvio
 
-**Prerequisiti: Python 3.11/3.12 e [Ollama](https://ollama.com/download) installati.**
+**Prerequisiti: Python 3.13/3.12 e [Ollama](https://ollama.com/download) installati. (Tutti i test per questa app sono stati fatti con python 3.12 tuttvia 3.13 dovrebbe essere compatibile)**
 
 Poi basta fare doppio clic su:
 - **`avvia.bat`** su Windows
@@ -68,7 +68,7 @@ Ollama rileva automaticamente la GPU se disponibile (NVIDIA o Apple Silicon): i 
 | Validazione dati | Pydantic v2 |
 | Export e riconciliazione | Pandas |
 | Database | SQLite (migrabile a PostgreSQL senza modifiche al codice) |
-| Frontend | Jinja2 + HTMX |
+| Frontend | ??? |
 
 ---
 
