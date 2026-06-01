@@ -1,3 +1,4 @@
+# src/app/parsers/__init__.py
 """
 Parser base per la conversione PDF → Markdown.
 
@@ -21,6 +22,7 @@ from app.services.smart_compressor import SmartCompressor
 
 logger = logging.getLogger(__name__)
 
+# Istanza condivisa del compressore (stateless, sicura per uso concorrente)
 _compressor = SmartCompressor(repeat_threshold=0.55, min_line_len=10)
 
 
@@ -80,6 +82,9 @@ class BaseParser(ABC):
         """
         import re
         markdown = re.sub(r"<!--\s*image\s*-->", "", markdown)
+        # Decodifica entità HTML lasciate da Docling (es. C&amp;F → C&F)
+        import html
+        markdown = html.unescape(markdown)
         markdown = re.sub(r"Pag\.\s*\d+\s*di\s*\d+", "", markdown)
         markdown = re.sub(r"\n{3,}", "\n\n", markdown)
         return markdown.strip()

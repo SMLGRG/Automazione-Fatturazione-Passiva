@@ -3,13 +3,13 @@ import logging
 import yaml
 from pathlib import Path
 from app.parsers import BaseParser, GenericParser
-from app.parsers.galardi import GalardiParser
 
 logger = logging.getLogger(__name__)
 
-CARRIER_PARSERS: dict[str, type[BaseParser]] = {
-    "galardi": GalardiParser,
-}
+# Registro parser per carrier specifici.
+# Attualmente vuoto: tutti i carrier usano GenericParser + SmartCompressor.
+# Per aggiungere un parser custom in futuro: {"nome_carrier": MyParser}
+CARRIER_PARSERS: dict[str, type[BaseParser]] = {}
 
 
 def get_parser(carrier_name: str) -> BaseParser:

@@ -26,29 +26,56 @@ PROMPT_V1_20240601 = """Sei un estrattore di dati specializzato in fatture di tr
 Il tuo compito è estrarre le informazioni strutturate dalla fattura fornita
 e restituire ESCLUSIVAMENTE un singolo oggetto JSON valido, senza testo aggiuntivo.
 
-ESEMPIO:
+DEFINIZIONI IMPORTANTI:
+- MITTENTE (sender_name): chi spedisce la merce, l'azienda emittente (es. "MARCHI & FILDI")
+- DESTINATARIO (recipient_name): chi riceve la merce, il cliente finale
+- DESTINAZIONE (destination_city): la città del destinatario, NON del mittente
+- CAP (destination_postal_code): il codice postale del destinatario, NON del mittente
+- PAESE (destination_country): il paese del destinatario, NON del mittente
+- DATA SPEDIZIONE (shipment_date): la data della singola spedizione dopo "Del", NON la data della fattura
+- PESO (weight_kg): il valore numerico dopo la parola "Lordi" nel testo
+- PREZZO (total_amount): il valore dopo "Totale EUR" in fondo al blocco spedizione, NON le singole voci di dettaglio
+
+FORMATO TIPICO DI UN BLOCCO SPEDIZIONE (Galardi):
+  Spedizione :ETMP010 303032 Del 10/01/23
+  Mittente :MARCHI & FILDI   Destinatario :ABSOLUTE FRESH UNIPESS
+   :13900 BIELLA IT          :3754 905 VALONGO DA VOUGA PT
+  Lordi 1348,10
+  Totale EUR 373,85
+
+In questo formato la riga ":13900 BIELLA IT" è mittente (ignora),
+la riga ":3754 905 VALONGO DA VOUGA PT" contiene: CAP=3754, città=VALONGO DA VOUGA, paese=PT
+
+ESEMPIO COMPLETO:
 
 Input:
-CARRIER: DHL Express
-FATTURA: 2024-00123 del 15/03/2024
-TOTALE FATTURA: 12.50
-SPEDIZIONE 1: tracking=1Z999AA10123456784 data=15/03/24 destinatario=Mario Rossi paese=IT peso=2.5 importo=12.50
+CARRIER: Galardi
+FATTURA: 2300800441 del 31/01/2023
+TOTALE FATTURA: 5729.11
+Spedizione :ETMP010 303032 Del 10/01/23
+Mittente :MARCHI & FILDI   Destinatario :ABSOLUTE FRESH UNIPESS
+ :13900 BIELLA IT          :3754 905 VALONGO DA VOUGA PT
+Lordi 1348,10
+Totale EUR 373,85
 
-Output JSON (UN SOLO OGGETTO con shipments annidati):
+Output JSON:
 {{
-  "carrier_name": "DHL Express",
-  "invoice_number": "2024-00123",
-  "invoice_date": "2024-03-15",
-  "total_invoice_amount": "12.50",
+  "carrier_name": "Galardi",
+  "invoice_number": "2300800441",
+  "invoice_date": "2023-01-31",
+  "total_invoice_amount": "5729.11",
   "shipments": [
     {{
-      "tracking_number": "1Z999AA10123456784",
-      "invoice_date": "2024-03-15",
-      "total_amount": "12.50",
-      "recipient_name": "Mario Rossi",
-      "destination_country": "IT",
-      "weight_kg": "2.5",
-      "service_type": null
+      "tracking_number": "ETMP010 303032",
+      "shipment_date": "2023-01-10",
+      "sender_name": "MARCHI & FILDI",
+      "recipient_name": "ABSOLUTE FRESH UNIPESS",
+      "destination_city": "VALONGO DA VOUGA",
+      "destination_postal_code": "3754",
+      "destination_country": "PT",
+      "weight_kg": "1348.10",
+      "service_type": "CIP",
+      "total_amount": "373.85"
     }}
   ]
 }}
@@ -56,9 +83,14 @@ Output JSON (UN SOLO OGGETTO con shipments annidati):
 REGOLE OBBLIGATORIE:
 - Restituisci UN SOLO oggetto JSON con shipments annidati dentro
 - Nomi campo esatti: carrier_name, invoice_number, invoice_date, total_invoice_amount, shipments
-- Per ogni spedizione: tracking_number, invoice_date, total_amount, recipient_name, destination_country, weight_kg, service_type
+- Per ogni spedizione: tracking_number, shipment_date, sender_name, recipient_name, destination_city, destination_postal_code, destination_country, weight_kg, service_type, total_amount
 - Date in formato YYYY-MM-DD
-- Importi come stringa numerica con punto decimale (es. "373.85" non "373,85")
+- Importi e pesi come stringa numerica con punto decimale (es. "1348.10" non "1348,10")
+- total_amount è SEMPRE il valore dopo "Totale EUR" in fondo al blocco, mai le singole voci (005, 065, B23, 113)
+- destination_country è il paese del DESTINATARIO (codice a 2 lettere dopo la città del destinatario)
+- destination_postal_code è il codice numerico prima della città del destinatario
+- weight_kg è il numero dopo "Lordi" nel blocco spedizione
+- service_type è il codice resa tra parentesi es. CIP, DAP, C&F (non "C&amp;F")
 - Se un campo non è presente nel testo, usa null
 
 --- FATTURA DA PROCESSARE ---
@@ -201,7 +233,8 @@ class OllamaExtractor:
                 # Il primo chunk valido fornisce i metadati della fattura
                 if header_extraction is None:
                     header_extraction = result
-                    header_extraction.shipments = []
+                    # NON azzerare le spedizioni: il primo chunk le contiene già
+                    # le aggiungiamo nel loop sottostante come tutti gli altri
 
                 # Aggiungi spedizioni deduplicando per tracking_number
                 for shipment in result.shipments:

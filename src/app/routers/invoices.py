@@ -10,6 +10,7 @@ from app.services import PipelineService
 router = APIRouter(prefix="/invoices", tags=["Fatture"])
 
 invoice_store: dict[int, InvoiceStatus] = {}
+reconciliation_store: dict[int, dict] = {}  # invoice_id → report.to_dict()
 invoice_counter = 0
 
 
@@ -90,4 +91,6 @@ def reconcile_invoice(invoice_id: int):
         raise HTTPException(status_code=400, detail="CSV non disponibile")
     from app.services.reconciler import reconcile
     report = reconcile(csv_path, invoice_id)
-    return report.to_dict()
+    result = report.to_dict()
+    reconciliation_store[invoice_id] = result  # salva per reports.py
+    return result
