@@ -8,3 +8,169 @@ test_estrazione.py
 test_m2.py
 run.py
 README2.md
+# ============================================================
+# FIX 1 — template_generator.py
+# Funzione _find_best_splitter: usa regex \s+ per matching flessibile
+# ============================================================
+
+def _find_best_splitter(markdown_text: str) -> tuple[str, int]:
+    known_candidates = [
+        "Groupage :",
+        "Riferimenti:",
+        "RIFERIMENTO CORRISPONDENTE:",
+        "Rif. Mitt.",
+        "Spedizione N.",
+        "Lettera di Vettura",
+        "Tracking:",
+        "Consegna:",
+        "Our Reference",
+    ]
+
+    best_candidate = "\n\n"
+    max_count = 1
+    PRIORITY_THRESHOLD = 1.5
+
+    for candidate in known_candidates:
+        # FIX: usa regex con \s+ invece di count() esatto
+        # Permette di trovare "Groupage            :" anche se nel template è "Groupage :"
+        pattern = re.escape(candidate).replace(r"\ ", r"\s+")
+        matches = re.findall(pattern, markdown_text)
+        count = len(matches)
+        required = max_count * PRIORITY_THRESHOLD if best_candidate != "\n\n" else 1
+        if count >= required:
+            max_count = count
+            # Salva il testo LETTERALE trovato nel documento (con gli spazi reali)
+            # così il parser può splittare esattamente sul testo presente nel PDF
+            best_candidate = matches[0] if matches else candidate
+
+    if best_candidate == "\n\n":
+        line_counts: dict[str, int] = {}
+        for line in markdown_text.splitlines():
+            stripped = line.strip()
+            if 5 < len(stripped) < 60 and not re.fullmatch(r"[\d\s\.,\-]+", stripped):
+                line_counts[stripped] = line_counts.get(stripped, 0) + 1
+        for line, count in line_counts.items():
+            if count > max_count:
+                max_count = count
+                best_candidate = line
+
+    logger.info(f"[TemplateGen] Splitter: '{best_candidate}' ({max_count} occorrenze)")
+    return best_candidate, max_count
+
+
+# ============================================================
+# FIX 2 — template_generator.py
+# Funzione _build_extraction_prompt: aggiunge nota su Borderò
+# ============================================================
+
+def _build_extraction_prompt(carrier_name, fields, sample_block):
+    fields_lines = []
+    for f in fields:
+        line = f'- "{f.name}": {f.description}. Esempio: "{f.example}".'
+        if f.hint:
+            line += f" Dove trovarlo: {f.hint}."
+        fields_lines.append(line)
+
+    return (
+        f"Sei un estrattore dati per fatture del corriere {carrier_name}.\n"
+        f"Ricevi uno o più blocchi di testo, ciascuno descrive UNA spedizione.\n\n"
+        f"CAMPI DA ESTRARRE:\n" + "\n".join(fields_lines) + "\n\n"
+        "NOTA SUL FORMATO:\n"
+        "- Il testo proviene da PDF, i valori possono essere su righe separate dall'etichetta.\n"
+        "- Per 'tracking_number': ignorare codici preceduti da 'Borderò N°:' o 'Borderò:' "
+        "sulla riga immediatamente precedente — quelli sono numeri di spedizione collettiva, "
+        "non il tracking della singola spedizione. Il tracking corretto si trova subito dopo.\n"
+        "- Per 'total_amount': il valore può trovarsi sulla riga successiva a 'TOTALE: EUR', "
+        "oppure 'TOTALE: EUR' non ha valore esplicito e il totale è l'ultimo importo sulla riga "
+        "dei costi (es. '620,00 620,00' → totale 620,00; '1,00 0,11 1,11' → totale 1,11).\n"
+        "- Cerca sempre il valore corretto in entrambe le posizioni.\n\n"
+        f"ESEMPIO DI BLOCCO:\n---\n{sample_block[:600]}\n---\n\n"
+        "REGOLE:\n"
+        "- Restituisci un array JSON: [{...}, {...}]\n"
+        "- Un oggetto per ogni spedizione trovata\n"
+        '- Usa stringa vuota "" per i campi assenti\n'
+        "- Importi con virgola italiana (es. \"253,62\")\n"
+        "- Date nel formato trovato nel testo\n"
+        "- Solo il JSON, nessuna spiegazione"
+    )
+
+
+# ============================================================
+# FIX 3 — configurable_parser.py
+# parse_local: splitter con whitespace flessibile
+# ============================================================
+# Sostituire nel metodo parse_local il blocco SPLIT IN BLOCCHI:
+
+"""
+        # --- SPLIT IN BLOCCHI ---
+        blocks = [markdown]
+        if splitter:
+            splitter_pattern = re.escape(splitter).replace(r'\ ', r'\s+')
+            if re.search(splitter_pattern, markdown):
+                blocks = re.split(splitter_pattern, markdown)
+                logger.info(f"[Parser] Splitter '{splitter}' → {len(blocks)} blocchi")
+
+        shipment_blocks = [b for b in blocks if len(b.strip()) >= 20]
+"""
+
+
+# ============================================================
+# FIX 4 — configurable_parser.py
+# _extract_first_shipment_llm: isola la spedizione saltando i Borderò
+# ============================================================
+
+def _extract_first_shipment_llm(self, block0: str, extraction_prompt: str) -> dict:
+    """
+    FIX 3 — Estrae la prima spedizione dal blocco 0.
+    Isola il testo della spedizione saltando i numeri Borderò che
+    precedono il tracking reale nella stessa riga o blocco.
+    """
+    # Trova il primo tracking che NON sia preceduto da "Borderò" sulla riga prima
+    relevant_text = block0[:2000]
+    matches = list(re.finditer(r'\d{2}/\d{2}/\d{6}', block0))
+    for m in matches:
+        line_start = block0.rfind('\n', 0, m.start())
+        line_before = block0[line_start:m.start()].strip()
+        if re.search(r'border[oò°]', line_before, re.IGNORECASE):
+            continue  # Salta i numeri Borderò
+        # Trovato il tracking reale: prendi il testo da questo punto
+        start = max(0, m.start() - 30)
+        relevant_text = block0[start:start + 2000]
+        break
+
+    prompt = (
+        extraction_prompt + "\n\n"
+        "IMPORTANTE: Il testo seguente contiene dati di UNA spedizione. "
+        "Ignora qualsiasi intestazione fattura, IVA, totali di fattura, dati aziendali. "
+        "Estrai SOLO i dati della singola spedizione "
+        "(tracking, data spedizione, mittente, destinatario, importo spedizione).\n\n"
+        f"TESTO:\n{relevant_text}\n\n"
+        "Restituisci un array JSON con UN solo oggetto per la spedizione trovata. Solo il JSON."
+    )
+    try:
+        raw = self._call_ollama(prompt, timeout=60.0)
+        arr_match = re.search(r"\[.*\]", raw, re.DOTALL)
+        if arr_match:
+            results = json.loads(arr_match.group(0))
+            if isinstance(results, list) and results:
+                return results[0]
+        obj_match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if obj_match:
+            return json.loads(obj_match.group(0))
+    except Exception as e:
+        logger.warning(f"[Parser Block0] Errore: {e}")
+    return {}
+
+
+# ============================================================
+# FIX 5 — carrier_detector.py
+# _extract_keywords_from_header: deduplica keywords
+# ============================================================
+# Sostituire l'ultima riga della funzione:
+# da:
+#   return [k for k in keywords if len(k) >= 4 and not k.isdigit()]
+# a:
+#   return list(set(k for k in keywords if len(k) >= 4 and not k.isdigit()))
+
+ENDOFFILE
+echo "Fixes scritti"

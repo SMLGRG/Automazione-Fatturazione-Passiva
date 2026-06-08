@@ -6,5 +6,5 @@ outputs/
 *.db
 .venv/
 tests/
-config/carriers/
+config
 app/parsers/galardi.py

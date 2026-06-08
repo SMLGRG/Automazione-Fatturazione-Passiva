@@ -3,10 +3,11 @@ import logging
 import logging.config
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.templating import Jinja2Templates
-
+from pathlib import Path
 from app.routers import invoices, reports, health
+from dotenv import load_dotenv
 
+load_dotenv()  # legge il .env dalla root (dove viene lanciato uvicorn)
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -23,7 +24,7 @@ LOGGING_CONFIG = {
         },
         "file": {
             "class": "logging.FileHandler",
-            "filename": "outputs/pipeline.log",
+            "filename": str(Path(__file__).parent.parent.parent / "outputs" / "pipeline.log"),
             "formatter": "structured",
             "encoding": "utf-8",
         },
@@ -33,7 +34,10 @@ LOGGING_CONFIG = {
         "handlers": ["console", "file"],
     },
 }
+Path("outputs").mkdir(exist_ok=True)
 
+log_path = Path(__file__).parent.parent.parent / "outputs"
+log_path.mkdir(exist_ok=True)
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
@@ -41,6 +45,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Applicazione avviata — pipeline pronta")
+    
     yield
     logger.info("Applicazione in chiusura")
 
@@ -55,6 +60,4 @@ app = FastAPI(
 app.include_router(invoices.router)
 app.include_router(reports.router)
 app.include_router(health.router)
-
-templates = Jinja2Templates(directory="app/templates")
 

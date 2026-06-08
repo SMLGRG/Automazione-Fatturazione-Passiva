@@ -16,7 +16,7 @@ class HealthResponse(BaseModel):
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
     ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-    model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
+    model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
     
     ollama_reachable = False
     model_loaded = False
@@ -28,7 +28,7 @@ async def health_check():
             if resp.status_code == 200:
                 ollama_reachable = True
                 tags = resp.json().get("models", [])
-                model_loaded = any(t["name"].startswith(model_name) for t in tags)
+                model_loaded = any(t["name"] == model_name or t["name"].startswith(model_name + ":") for t in tags)
             
             # Verifica GPU
             gpu_resp = await client.get(f"{ollama_url}/api/ps")

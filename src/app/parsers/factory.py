@@ -1,44 +1,36 @@
-# src/app/parsers/factory.py
 import logging
-import yaml
+import re
 from pathlib import Path
-from app.parsers import BaseParser, GenericParser
+from app.parsers import GenericParser
+from app.parsers.configurable_parser import ConfigurableParser
 
 logger = logging.getLogger(__name__)
 
-# Registro parser per carrier specifici.
-# Attualmente vuoto: tutti i carrier usano GenericParser + SmartCompressor.
-# Per aggiungere un parser custom in futuro: {"nome_carrier": MyParser}
-CARRIER_PARSERS: dict[str, type[BaseParser]] = {}
+TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "config" / "templates"
 
 
-def get_parser(carrier_name: str) -> BaseParser:
-    parser_class = CARRIER_PARSERS.get(carrier_name.lower(), GenericParser)
-    logger.info(f"Assegnato parser: {parser_class.__name__} per il carrier '{carrier_name}'")
-    return parser_class()
+def get_parser(
+    carrier_name: str,
+    ollama_base_url: str = "http://localhost:11434",
+    ollama_model: str = "qwen2.5:7b",
+) -> GenericParser | ConfigurableParser:
+    carrier_lower = carrier_name.lower()
 
+    if carrier_lower == "unknown":
+        return GenericParser()
 
-def detect_carrier(markdown_content: str, config_dir: Path) -> str:
-    if not config_dir.exists():
-        logger.warning(f"Directory di configurazione non trovata: {config_dir}")
-        return "unknown"
+    TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+    carrier_slug = re.sub(r"[^\w]", "_", carrier_lower)
+    template_path = TEMPLATES_DIR / f"{carrier_slug}.json"
 
-    for yaml_file in config_dir.glob("*.yaml"):
-        try:
-            config = yaml.safe_load(yaml_file.read_text(encoding="utf-8"))
-            if not config or "keywords" not in config:
-                continue
+    if not template_path.exists():
+        logger.warning(f"[Factory] Template per '{carrier_name}' non trovato. Usato GenericParser.")
+        return GenericParser()
 
-            carrier_name = config.get("carrier_name", yaml_file.stem.upper())
-
-            for keyword in config["keywords"]:
-                if keyword.lower() in markdown_content.lower():
-                    logger.info(f"Carrier identificato tramite keyword '{keyword}': {carrier_name}")
-                    return carrier_name
-
-        except Exception as e:
-            logger.error(f"Errore lettura config {yaml_file.name}: {e}")
-            continue
-
-    logger.warning("Impossibile identificare il trasportatore dalle parole chiave.")
-    return "unknown"
+    logger.info(f"[Factory] Assegnato ConfigurableParser basato sul file: {template_path.name}")
+    try:
+        return ConfigurableParser(template_path, ollama_base_url, ollama_model)
+    except Exception as e:
+        logger.error(f"[Factory] Template {template_path.name} corrotto: {e}. Ripiego su GenericParser.")
+        template_path.unlink(missing_ok=True)
+        return GenericParser()

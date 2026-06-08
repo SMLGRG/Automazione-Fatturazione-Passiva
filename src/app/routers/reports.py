@@ -1,7 +1,6 @@
 # app/routers/reports.py
-import os
-from pathlib import Path
 from fastapi import APIRouter, HTTPException
+from app.state import reconciliation_store, invoice_store
 
 router = APIRouter(prefix="/reports", tags=["Report"])
 
@@ -12,8 +11,6 @@ def list_reconciliation_reports():
     Restituisce tutti i report di riconciliazione prodotti nella sessione corrente.
     Un report compare solo dopo aver chiamato POST /invoices/{id}/reconcile.
     """
-    from app.routers.invoices import reconciliation_store, invoice_store
-
     results = []
     for invoice_id, report in reconciliation_store.items():
         invoice = invoice_store.get(invoice_id)
@@ -39,7 +36,6 @@ def reconciliation_summary():
     Utile per avere una visione d'insieme: quante fatture hanno discrepanze,
     il delta EUR totale e il dettaglio per carrier.
     """
-    from app.routers.invoices import reconciliation_store, invoice_store
 
     if not reconciliation_store:
         return {
@@ -124,7 +120,6 @@ def get_reconciliation_report(invoice_id: int):
     Restituisce il report di riconciliazione completo per una singola fattura.
     Errore 404 se la riconciliazione non è ancora stata eseguita per quella fattura.
     """
-    from app.routers.invoices import reconciliation_store
 
     if invoice_id not in reconciliation_store:
         raise HTTPException(
